@@ -15,7 +15,7 @@ public function up(): void
         $table->id();
         $table->string('name_kategori', 100)->unique();
         $table->string('code_kategori', 10)->unique();
-        $table->timestamps();
+        $table->timestamp('created_at')->nullable();
     });
 }
     /**
