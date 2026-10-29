@@ -10,15 +10,13 @@ class Kategori extends Model
 {
     use HasFactory;
 
-    protected $table = 'kategoris';
+    protected $table = 'categories';
 
-    protected $fillable = [
-        'kode_kategori',
-        'nama_kategori',
+    protected $fillable = ['equipment_id', 'borrower_name', 'borrower_nim', 'borrower_email',
+        'loan_date', 'expected_return_date', 'purpose', 'status', 'total_estimated_fee',
     ];
-
-    public function bukus(): HasMany
+    public function equipment(): BelongsTo
     {
-        return $this->hasMany(Buku::class, 'kategori_id');
+        return $this->belongsTo(Equipment::class); // Permintaan terhubung ke satu aset.
     }
 }

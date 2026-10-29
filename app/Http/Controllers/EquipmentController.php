@@ -2,43 +2,56 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Category;
+use App\Models\Equipment;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;          // untuk login dan logout
-use Illuminate\Support\Facades\Cookie;        // untuk menyimpan cookie
+use Illuminate\Validation\Rule;
 
-class AuthController extends Controller
+class EquipmentController extends Controller
 {
-    public function showLogin()               // method baru
+    public function index(Request $request)
     {
-        return view('auth.login');            // tampilkan halaman login
-    }
-
-    public function login(Request $request)
-    {
-        $credentials = $request->validate([   // cek isian login
-            'email'    => 'required|email',
-            'password' => 'required|string',
-        ]);
-
-        if (Auth::attempt($credentials, $request->boolean('remember'))) { // cocokkan email dan password dengan tabel users
-            $request->session()->regenerate();   // ganti nomor session baru, cegah serangan Session Fixation
-            session(['login_timestamp' => now()->format('d M Y, H:i:s') . ' WIB']); // simpan waktu login di SESSION
-            Cookie::queue('del_last_user_email', $request->email, 10080); // simpan email di COOKIE selama 7 hari (10080 menit)
-
-            return redirect()->intended(route('bukus.index')) // kembali ke halaman yang tadi dituju, atau ke daftar buku
-                ->with('success', 'Selamat datang, Pustakawan!'); // pesan sekali tampil (flash)
+        $query = Equipment::with('category'); // Ambil data aset beserta kategorinya.
+        if ($request->filled('search')) { // Cari jika kata kunci diisi.
+            $keyword = $request->search;
+            $query->where(function ($q) use ($keyword) {
+                $q->where('name', 'like', "%{$keyword}%") // Cari pada nama.
+                  ->orWhere('asset_code', 'like', "%{$keyword}%"); // Atau pada kode aset.
+            });
         }
-
-        return back()                         // login gagal: kembali ke form
-            ->with('error', 'Email atau password salah.')
-            ->withInput($request->only('email')); // hanya email yang dikembalikan, password tidak
+        if ($request->filled('category_id')) { $query->where('category_id', $request->category_id); } // Filter kategori.
+        if (in_array($request->status, ['tersedia','dipinjam','dalam_perbaikan'], true)) { $query->where('status', $request->status); } // Filter status yang valid.
+        $equipments = $query->latest()->paginate(5)->appends($request->query()); // Lima kartu per halaman dan pertahankan filter.
+        $categories = Category::orderBy('name')->get(); // Isi dropdown kategori.
+        return view('equipments.index', compact('equipments', 'categories')); // Kirim data ke halaman katalog.
     }
 
-    public function logout(Request $request)
+    public function create()
     {
-        Auth::logout();                       // keluarkan pengguna
-        $request->session()->invalidate();    // hapus seluruh isi session di server
-        $request->session()->regenerateToken(); // buat token CSRF baru
-        return redirect()->route('login')->with('success', 'Anda sudah keluar.');
+        $categories = Category::orderBy('name')->get(); // Ambil kategori untuk formulir.
+        return view('equipments.create', compact('categories')); // Tampilkan form tambah aset.
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([ // Validasi data dari browser di server.
+            'category_id' => ['required','exists:categories,id'],
+            'asset_code' => ['required','string','max:20','unique:equipments,asset_code'],
+            'name' => ['required','string','min:5','max:150'],
+            'specification' => ['nullable','string'],
+            'condition' => ['required', Rule::in(['baik','rusak_ringan','rusak_berat'])],
+            'daily_rental_fee' => ['required','numeric','min:0','max:4294967295'],
+            'image' => ['required','image','mimes:jpeg,png,webp','max:2048'],
+        ]);
+        $validated['image_path'] = $request->file('image')->store('equipments', 'public'); // Simpan foto dengan nama unik di storage publik.
+        unset($validated['image']); // Hapus field upload sebelum menyimpan ke tabel.
+        $equipment = Equipment::create($validated); // Simpan data aset.
+        return redirect()->route('equipments.index')->with('success', "Perangkat {$equipment->name} ({$equipment->asset_code}) berhasil didaftarkan!"); // PRG dan notifikasi sukses.
+    }
+
+    public function show(Equipment $equipment)
+    {
+        $equipment->load('category', 'loanRequests'); // Ambil kategori dan riwayat peminjaman.
+        return view('equipments.show', compact('equipment')); // Tampilkan detail aset.
     }
 }

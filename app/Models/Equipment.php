@@ -7,36 +7,35 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Buku extends Model
+class Equipment extends Model
 {
     use HasFactory;
 
-    protected $table = 'bukus';
 
     protected $fillable = [
-        'isbn',
-        'judul',
-        'penulis',
-        'penerbit',
-        'tahun_terbit',
-        'kategori_id',
-        'stok',
-        'sinopsis',
+        'category_id',
+        'asset_code',
+        'name',
+        'spesification',
+        'condition',
+        'status',
+        'daily_rental_fee',
+        
     ];
 
     /**
      * Relasi ke model Kategori (BelongsTo)
      */
-    public function kategori(): BelongsTo
+    public function category(): BelongsTo
     {
-        return $this->belongsTo(Kategori::class, 'kategori_id');
+        return $this->belongsTo(Kategori::class, 'categori_id');
     }
 
     /**
      * Relasi ke model Peminjaman (HasMany)
      */
-    public function peminjamans(): HasMany
+    public function loanRequests(): HasMany
     {
-        return $this->hasMany(Peminjaman::class);
+        return $this->hasMany(LoanRequest::class);
     }
 }
